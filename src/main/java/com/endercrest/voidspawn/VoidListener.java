@@ -7,17 +7,21 @@ import com.endercrest.voidspawn.options.Option;
 import com.endercrest.voidspawn.utils.MessageUtil;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
 import org.bukkit.*;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.util.Vector;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ExecutionException;
@@ -35,15 +39,48 @@ public class VoidListener implements Listener {
     private final Cache<UUID, Integer> bounceTracker = CacheBuilder.newBuilder()
             .expireAfterWrite(5, TimeUnit.SECONDS)
             .build();
+    private final Map<UUID, ScheduledTask> taskMap = new HashMap<>();
 
     public VoidListener(VoidSpawn plugin) {
         this.plugin = plugin;
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            registerCheckTask(player);
+        }
+    }
+
+    public void registerCheckTask(Player player) {
+        VoidCheckTask task = new VoidCheckTask(this, player.getUniqueId());
+        ScheduledTask scheduledTask = Bukkit.getGlobalRegionScheduler().runAtFixedRate(plugin, task, 20, 20);
+        taskMap.put(player.getUniqueId(), scheduledTask);
+    }
+
+    public void unregisterCheckTask(Player player) {
+        UUID playerId = player.getUniqueId();
+        ScheduledTask task = taskMap.remove(playerId);
+        if (task != null) {
+            task.cancel();
+        }
+    }
+
+    public void cancelAllTasks() {
+        for (ScheduledTask task : taskMap.values()) {
+            task.cancel();
+        }
+        taskMap.clear();
     }
 
     @EventHandler
-    public void onMoveEvent(PlayerMoveEvent event) {
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        registerCheckTask(event.getPlayer());
+    }
+
+    @EventHandler
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        unregisterCheckTask(event.getPlayer());
+    }
+
+    public void performVoidSpawnCheck(Player player) {
         TeleportResult result = TeleportResult.INCOMPLETE_MODE;
-        Player player = event.getPlayer();
         World world = player.getWorld();
         String worldName = world.getName();
 
@@ -66,13 +103,11 @@ public class VoidListener implements Listener {
             return;
         }
 
-
         Instant instant = activationTracker.getIfPresent(player.getUniqueId());
         if (mode != null) {
             try {
                 Integer bounceMax = mode.getOption(BaseMode.OPTION_BOUNCE).getValue(world).orElse(0);
                 if (bounceMax > 0) {
-
                     Integer bounce = bounceTracker.get(player.getUniqueId(), () -> 0);
                     if (bounce < bounceMax) {
                         // We are going to bounce the player instead of activate the mode
@@ -109,14 +144,12 @@ public class VoidListener implements Listener {
             activateDamage(mode, player, world);
         }
 
-
         if (result != TeleportResult.SUCCESS && instant == null) {
             player.sendMessage(MessageUtil.colorize("&cAn error occurred, notify an administrator."));
             plugin.log("Error while teleporting player: " + result.getMessage());
             if (mode != null) {
                 player.sendMessage(MessageUtil.colorize(String.format("&cDetails, World: %s, Mode: %s", worldName, mode.getName())));
                 plugin.log(String.format("Details, World: %s, Mode: %s", worldName, mode.getName()));
-
             }
         }
     }

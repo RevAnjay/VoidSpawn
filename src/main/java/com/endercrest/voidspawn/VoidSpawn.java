@@ -13,6 +13,8 @@ import org.bukkit.plugin.java.JavaPlugin;
 public class VoidSpawn extends JavaPlugin {
     public static String prefix = "[&6VS&f] ";
 
+    private VoidListener voidListener;
+
     public void onEnable(){
         try {
             // This is the class we check for as it was added in 1.13 and should remain in place for the long term.
@@ -34,7 +36,8 @@ public class VoidSpawn extends JavaPlugin {
         TeleportManager.getInstance().setUp(this);
         ModeManager.getInstance().setUp(this);
         DetectorManager.getInstance().setUp();
-        getServer().getPluginManager().registerEvents(new VoidListener(this), this);
+        voidListener = new VoidListener(this);
+        getServer().getPluginManager().registerEvents(voidListener, this);
         getServer().getPluginManager().registerEvents(new QuitListener(), this);
 
         PluginCommand command = getCommand("voidspawn");
@@ -48,6 +51,9 @@ public class VoidSpawn extends JavaPlugin {
     }
 
     public void onDisable(){
+        if (voidListener != null) {
+            voidListener.cancelAllTasks();
+        }
         log("&ev" + getDescription().getVersion() + " saving config");
         ConfigManager.getInstance().saveConfig();
         log("&ev" + getDescription().getVersion() + " disabled");
