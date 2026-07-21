@@ -6,6 +6,7 @@ description: Teleports player on contact with the void.
 authors: [tcvs]
 softdepend: [BentoBox, uSkyBlock, SuperiorSkyblock2]
 api-version: 1.21
+folia-supported: true
 commands:
     voidspawn:
         description: All commands for voidspawn

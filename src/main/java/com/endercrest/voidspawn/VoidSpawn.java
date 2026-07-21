@@ -45,7 +45,7 @@ public class VoidSpawn extends JavaPlugin {
         command.setExecutor(commandHandler);
         command.setTabCompleter(new VoidSpawnTabCompleter(commandHandler));
 
-        Bukkit.getScheduler().runTaskTimer(this, new TouchTracker(), 5, 5);
+        Bukkit.getGlobalRegionScheduler().runAtFixedRate(this, (task) -> new TouchTracker().run(), 5, 5);
 
         log("&ev" + getDescription().getVersion() + " by EnderCrest enabled");
     }
